@@ -1,0 +1,40 @@
+# KG-Agent配置文件
+agent:
+  name: "KG-Agent-Reproduction"
+  version: "1.0.0"
+
+reasoning:
+  max_search_depth: 3
+  similarity_threshold: 0.8
+  confidence_threshold: 0.7
+  timeout: 30
+
+memory:
+  decay_rate: 0.1
+  reinforcement_threshold: 3
+  max_memory_size: 1000
+  short_term_capacity: 100
+  long_term_capacity: 1000
+
+knowledge:
+  graph_path: "data/knowledge_graph.json"
+  embedding_dim: 128
+  entity_types:
+    - person
+    - organization
+    - location
+    - event
+    - concept
+    - product
+  relation_types:
+    - is_a
+    - part_of
+    - located_in
+    - works_for
+    - created_by
+    - related_to
+
+logging:
+  level: "INFO"
+  file: "logs/kg_agent.log"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

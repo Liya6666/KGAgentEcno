@@ -1,0 +1,36 @@
+# MAGE系统默认配置
+simulation:
+  name: "Economic_Simulation"
+  num_steps: 1000
+  step_interval: 0.1
+  save_interval: 50
+  random_seed: 42
+
+economy:
+  markets:
+    - name: "food"
+      initial_price: 50.0
+    - name: "labor"
+      initial_price: 100.0
+    - name: "capital"
+      initial_price: 1000.0
+  
+  agents:
+    consumers:
+      count: 10
+      initial_wealth: 1000.0
+    producers:
+      count: 5
+      initial_wealth: 5000.0
+    investors:
+      count: 3
+      initial_wealth: 10000.0
+
+knowledge_graph:
+  update_frequency: 10
+  similarity_threshold: 0.8
+  max_recommendations: 5
+
+logging:
+  level: "INFO"
+  file: "logs/simulation.log"
