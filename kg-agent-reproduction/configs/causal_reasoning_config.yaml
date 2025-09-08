@@ -1,0 +1,53 @@
+# 因果推理策略配置文件
+
+# 基本设置
+causal_reasoning:
+  max_causal_depth: 4
+  confidence_threshold: 0.65
+  enable_temporal_analysis: true
+  enable_counterfactual_analysis: true
+  
+# 因果发现算法
+causal_discovery:
+  algorithm: "PC"  # PC, FCI, LiNGAM等
+  alpha: 0.05  # 显著性水平
+  max_cond_vars: 3
+  
+# 因果强度计算
+causal_strength:
+  method: "average"  # average, weighted, max
+  temporal_weight: 0.3
+  structural_weight: 0.4
+  empirical_weight: 0.3
+  
+# 干预分析
+intervention_analysis:
+  enable_indirect_effects: true
+  enable_interaction_effects: true
+  confidence_interval: 0.95
+  
+# 混杂因素控制
+confounder_control:
+  method: "backdoor_adjustment"  # backdoor, frontdoor, instrumental_variable
+  max_confounders: 5
+  sensitivity_analysis: true
+  
+# 反事实推理
+counterfactual:
+  enable_individual_effects: true
+  enable_population_effects: true
+  enable_mediation_analysis: true
+  
+# 数据要求
+data_requirements:
+  min_time_points: 10
+  min_entities: 3
+  temporal_granularity: "quarterly"  # daily, weekly, monthly, quarterly, yearly
+  require_exogenous_vars: true
+  
+# 输出设置
+output:
+  include_causal_graph: true
+  include_intermediate_results: false
+  format: "json"  # json, yaml, xml
+  verbosity: "detailed"  # brief, standard, detailed
