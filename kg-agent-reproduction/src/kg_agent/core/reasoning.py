@@ -41,9 +41,6 @@ class PathFindingStrategy(ReasoningStrategy):
                          start: str, end: str) -> List[List[str]]:
         """查找实体间的路径"""
         # 简化的路径查找
-        # 实际实现应使用图算法如BFS、DFS或A*
-        
-        # 模拟路径查找
         if start == end:
             return [[start]]
         
@@ -58,6 +55,51 @@ class PathFindingStrategy(ReasoningStrategy):
         # 基于路径长度和质量的置信度计算
         shortest_path_length = min(len(path) for path in paths)
         return max(1.0 - 0.1 * (shortest_path_length - 1), 0.1)
+
+class EntityLinkingStrategy(ReasoningStrategy):
+    """实体链接推理策略"""
+    
+    async def reason(self, task: Dict[str, Any], 
+                    knowledge: Dict[str, Any], 
+                    memory: Any) -> Dict[str, Any]:
+        """执行实体链接推理"""
+        entities = task['entities']
+        subgraph = knowledge['subgraph']
+        
+        # 实体链接：将文本中的实体链接到知识图谱中的实体
+        linked_entities = []
+        for entity in entities:
+            linked = await self._link_entity(entity, subgraph)
+            linked_entities.append(linked)
+        
+        return {
+            'linked_entities': linked_entities,
+            'confidence': np.mean([e.get('confidence', 0.0) for e in linked_entities]),
+            'reasoning_type': 'entity_linking'
+        }
+    
+    async def _link_entity(self, entity: str, subgraph: Dict[str, Any]) -> Dict[str, Any]:
+        """链接单个实体到知识图谱"""
+        # 简化的实体链接逻辑
+        entities = subgraph.get('entities', {})
+        
+        # 查找匹配或相似的实体
+        for kg_entity in entities.keys():
+            if entity.lower() in kg_entity.lower() or kg_entity.lower() in entity.lower():
+                return {
+                    'original': entity,
+                    'linked': kg_entity,
+                    'confidence': 0.8,
+                    'properties': entities[kg_entity]
+                }
+        
+        # 如果没有找到精确匹配，返回最佳猜测
+        return {
+            'original': entity,
+            'linked': entity,
+            'confidence': 0.3,
+            'properties': {}
+        }
 
 class RelationPredictionStrategy(ReasoningStrategy):
     """关系预测推理策略"""
@@ -201,17 +243,62 @@ class ComplexReasoningStrategy(ReasoningStrategy):
             'steps_count': len(steps)
         }
 
+class QuestionAnsweringStrategy(ReasoningStrategy):
+    """问答推理策略"""
+    
+    async def reason(self, task: Dict[str, Any], 
+                    knowledge: Dict[str, Any], 
+                    memory: Any) -> Dict[str, Any]:
+        """执行问答推理"""
+        question = task.get('question', '')
+        entities = task.get('entities', [])
+        subgraph = knowledge['subgraph']
+        
+        # 基于问题和知识图谱生成答案
+        answer = await self._generate_answer(question, entities, subgraph)
+        
+        return {
+            'question': question,
+            'answer': answer['text'],
+            'confidence': answer['confidence'],
+            'supporting_facts': answer['supporting_facts'],
+            'reasoning_type': 'question_answering'
+        }
+    
+    async def _generate_answer(self, question: str, entities: List[str], 
+                             subgraph: Dict[str, Any]) -> Dict[str, Any]:
+        """生成答案"""
+        # 简化的问答逻辑
+        # 实际实现应使用自然语言处理和知识图谱问答技术
+        
+        # 基于实体和子图内容生成答案
+        entity_info = []
+        for entity in entities:
+            if entity in subgraph.get('entities', {}):
+                entity_info.append(f"{entity}: {subgraph['entities'][entity]}")
+        
+        answer_text = f"基于知识图谱分析，{'和'.join(entities)}之间的关系可以通过以下信息理解："
+        if entity_info:
+            answer_text += " " + " ".join(entity_info)
+        
+        return {
+            'text': answer_text,
+            'confidence': 0.7,
+            'supporting_facts': entity_info
+        }
+
 class ReasoningEngine:
     """推理引擎"""
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
+        # Update strategy mappings to use string literals
         self.strategies = {
-            TaskType.PATH_FINDING: PathFindingStrategy(),
-            TaskType.RELATION_PREDICTION: RelationPredictionStrategy(),
-            TaskType.COMPLEX_REASONING: ComplexReasoningStrategy(),
-            TaskType.ENTITY_LINKING: ComplexReasoningStrategy(),
-            TaskType.QUESTION_ANSWERING: ComplexReasoningStrategy()
+            "path_finding": PathFindingStrategy(),
+            "entity_linking": EntityLinkingStrategy(),
+            "relation_prediction": RelationPredictionStrategy(),
+            "complex_reasoning": ComplexReasoningStrategy(),
+            "question_answering": QuestionAnsweringStrategy()
         }
     
     async def reason(self, task: Dict[str, Any], 
@@ -221,7 +308,7 @@ class ReasoningEngine:
         task_type = task['task_type']
         
         if task_type not in self.strategies:
-            task_type = TaskType.COMPLEX_REASONING
+            task_type = "complex_reasoning"  # Default fallback
         
         strategy = self.strategies[task_type]
         return await strategy.reason(task, knowledge, memory)

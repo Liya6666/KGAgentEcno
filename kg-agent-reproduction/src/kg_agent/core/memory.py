@@ -102,6 +102,27 @@ class MemorySystem:
         self.decay_rate = config.get('decay_rate', 0.1)
         self.reinforcement_threshold = config.get('reinforcement_threshold', 3)
     
+    async def store(self, memory_entry: Dict[str, Any]) -> None:
+        """存储记忆条目 - 兼容agent.py的接口"""
+        task = memory_entry.get('task', {})
+        result = memory_entry.get('result', {})
+        
+        # 使用现有的store_experience方法
+        await self.store_experience(task, result)
+    
+    async def get_usage(self) -> float:
+        """获取内存使用率"""
+        stats = self.get_memory_stats()
+        total_memory = (
+            stats['short_term_size'] + 
+            stats['long_term_size'] + 
+            stats['semantic_memory_size'] + 
+            stats['procedural_memory_size']
+        )
+        # 简化的使用率计算，最大容量假设为10000
+        max_capacity = 10000
+        return min(total_memory / max_capacity, 1.0)
+    
     async def store_experience(self, task: Dict[str, Any], result: Dict[str, Any]):
         """存储经验"""
         experience = {

@@ -4,19 +4,16 @@ from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 import numpy as np
-from enum import Enum
 
-class TaskType(Enum):
-    PATH_FINDING = "path_finding"
-    ENTITY_LINKING = "entity_linking"
-    RELATION_PREDICTION = "relation_prediction"
-    COMPLEX_REASONING = "complex_reasoning"
-    QUESTION_ANSWERING = "question_answering"
+# 添加缺失的import
+from .reasoning import ReasoningEngine
+from .memory import MemorySystem
+from .knowledge import KnowledgeGraphInterface
 
 @dataclass
 class AgentState:
     """智能体状态"""
-    current_task: TaskType
+    current_task: str  # Changed from TaskType to str
     confidence_score: float
     reasoning_path: List[str]
     memory_usage: float
@@ -39,7 +36,7 @@ class KGAgent:
         
         # 状态管理
         self.state = AgentState(
-            current_task=TaskType.COMPLEX_REASONING,
+            current_task="complex_reasoning",  # Changed from TaskType.COMPLEX_REASONING
             confidence_score=0.0,
             reasoning_path=[],
             memory_usage=0.0,
@@ -172,94 +169,131 @@ class KGAgent:
         
         return result
     
-    def _identify_task_type(self, task: Dict[str, Any]) -> TaskType:
+    def _identify_task_type(self, task: Dict[str, Any]) -> str:
         """识别任务类型"""
         task_description = task.get('description', '').lower()
         
         if 'path' in task_description or 'reach' in task_description:
-            return TaskType.PATH_FINDING
+            return "path_finding"
         elif 'link' in task_description or 'connect' in task_description:
-            return TaskType.ENTITY_LINKING
+            return "entity_linking"
         elif 'predict' in task_description or 'relation' in task_description:
-            return TaskType.RELATION_PREDICTION
+            return "relation_prediction"
         elif 'complex' in task_description or 'reason' in task_description:
-            return TaskType.COMPLEX_REASONING
+            return "complex_reasoning"
         elif 'question' in task_description or 'answer' in task_description:
-            return TaskType.QUESTION_ANSWERING
+            return "question_answering"
         
-        return TaskType.COMPLEX_REASONING
+        return "complex_reasoning"
     
     async def _extract_entities(self, task: Dict[str, Any]) -> List[str]:
-        """提取实体"""
-        # 简化的实体提取
-        text = task.get('text', task.get('description', ''))
-        # 这里应该使用NER模型
-        entities = []
+        """提取实体 - 优先使用预定义实体"""
+        # 优先使用任务中预定义的实体
+        predefined_entities = task.get('entities', [])
+        if predefined_entities:
+            return predefined_entities
         
-        # 模拟实体提取
-        words = text.split()
-        for word in words:
-            if word[0].isupper() and len(word) > 2:
-                entities.append(word)
-        
-        return entities
+        # 如果没有预定义实体，从描述中提取
+        description = task.get('description', '')
+        # 这里应该使用实体识别模型
+        # 为了演示，返回一些模拟实体
+        return ['entity1', 'entity2']
     
     async def _extract_relations(self, task: Dict[str, Any]) -> List[str]:
         """提取关系"""
-        # 简化的关系提取
-        text = task.get('text', task.get('description', ''))
-        relations = []
+        # 从任务中提取关系类型
+        relations = task.get('relations', [])
+        if relations:
+            return relations
         
-        # 模拟关系提取
-        relation_keywords = ['is', 'has', 'related', 'connected', 'part_of']
-        for keyword in relation_keywords:
-            if keyword in text.lower():
-                relations.append(keyword)
-        
-        return relations
+        # 如果没有预定义关系，返回空列表
+        return []
     
     def _calculate_complexity(self, entities: List[str], relations: List[str]) -> float:
         """计算任务复杂度"""
-        return min(len(entities) * 0.3 + len(relations) * 0.2, 1.0)
-    
-    def _calculate_relevance(self, subgraph: Dict[str, Any], task: Dict[str, Any]) -> float:
-        """计算相关性分数"""
-        # 简化的相关性计算
-        return 0.8
+        """基于实体和关系数量计算复杂度"""
+        entity_complexity = len(entities) * 0.3
+        relation_complexity = len(relations) * 0.2
+        
+        return min(entity_complexity + relation_complexity, 1.0)
     
     def _calculate_confidence(self, result: Dict[str, Any]) -> float:
-        """计算置信度"""
-        # 基于推理路径和证据的置信度计算
-        path_length = len(self.state.reasoning_path)
-        evidence_score = result.get('evidence_score', 0.5)
+        """计算结果置信度"""
+        # 从推理结果中提取置信度
+        base_confidence = result.get('confidence', 0.5)
         
-        return min(evidence_score * (1.0 - 0.1 * path_length), 1.0)
+        # 可以添加更多置信度计算逻辑
+        return min(max(base_confidence, 0.0), 1.0)
     
     async def _check_consistency(self, result: Dict[str, Any]) -> bool:
-        """检查一致性"""
-        # 验证结果与知识图谱的一致性
+        """检查结果一致性"""
+        # 验证推理结果的一致性
+        # 这里可以添加逻辑一致性检查
         return True
     
     async def _refine_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """精炼结果"""
-        # 基于反馈调整结果
+        # 如果结果不一致，进行精炼
         return result
     
-    async def _update_memory(self, task: Dict[str, Any], result: Dict[str, Any]):
-        """更新记忆系统"""
-        await self.memory_system.store_experience(task, result)
+    def _calculate_relevance(self, subgraph: Dict[str, Any], task: Dict[str, Any]) -> float:
+        """计算知识相关性"""
+        # 计算检索到的知识与任务的相关性
+        entities = task['entities']
+        subgraph_entities = list(subgraph.get('entities', {}).keys())
+        
+        if not entities or not subgraph_entities:
+            return 0.0
+        
+        # 简单的重叠度计算
+        overlap = len(set(entities) & set(subgraph_entities))
+        return overlap / max(len(entities), len(subgraph_entities))
     
-    def _update_performance_metrics(self, start_time: datetime, success: bool):
+    async def _update_memory(self, task: Dict[str, Any], result: Dict[str, Any]) -> None:
+        """更新记忆系统"""
+        # 将任务和结果存储到记忆中
+        memory_entry = {
+            'task': task,
+            'result': result,
+            'timestamp': datetime.now().isoformat(),
+            'confidence': self.state.confidence_score
+        }
+        
+        await self.memory_system.store(memory_entry)
+        
+        # 更新内存使用率
+        self.state.memory_usage = await self.memory_system.get_usage()
+    
+    def _update_performance_metrics(self, start_time: datetime, success: bool) -> None:
         """更新性能指标"""
+        processing_time = (datetime.now() - start_time).total_seconds()
+        
         self.performance_metrics['total_tasks'] += 1
         if success:
             self.performance_metrics['successful_tasks'] += 1
         
         # 更新平均推理时间
-        current_time = (datetime.now() - start_time).total_seconds()
+        current_avg = self.performance_metrics['average_reasoning_time']
         total_tasks = self.performance_metrics['total_tasks']
-        avg_time = self.performance_metrics['average_reasoning_time']
-        
         self.performance_metrics['average_reasoning_time'] = (
-            (avg_time * (total_tasks - 1) + current_time) / total_tasks
+            (current_avg * (total_tasks - 1) + processing_time) / total_tasks
         )
+        
+        # 计算成功率
+        success_rate = self.performance_metrics['successful_tasks'] / self.performance_metrics['total_tasks']
+        self.performance_metrics['memory_efficiency'] = success_rate
+    
+    def get_performance_summary(self) -> Dict[str, Any]:
+        """获取性能摘要"""
+        return {
+            'agent_id': self.agent_id,
+            'total_tasks': self.performance_metrics['total_tasks'],
+            'success_rate': self.performance_metrics['successful_tasks'] / max(self.performance_metrics['total_tasks'], 1),
+            'average_reasoning_time': self.performance_metrics['average_reasoning_time'],
+            'memory_efficiency': self.performance_metrics['memory_efficiency'],
+            'current_state': {
+                'current_task': self.state.current_task,
+                'confidence_score': self.state.confidence_score,
+                'memory_usage': self.state.memory_usage
+            }
+        }
