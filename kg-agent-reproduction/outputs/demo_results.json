@@ -1,0 +1,211 @@
+[
+  {
+    "task_id": 1,
+    "task": {
+      "type": "path_finding",
+      "description": "Find the connection between Albert Einstein and Theory of Relativity",
+      "entities": [
+        "Albert_Einstein",
+        "Theory_of_Relativity"
+      ]
+    },
+    "result": {
+      "success": true,
+      "result": {
+        "linked_entities": [
+          {
+            "original": "Albert_Einstein",
+            "linked": "Albert_Einstein",
+            "confidence": 0.8,
+            "properties": {
+              "type": "person",
+              "birth_year": 1879,
+              "nationality": "German",
+              "profession": "physicist"
+            }
+          },
+          {
+            "original": "Theory_of_Relativity",
+            "linked": "Theory_of_Relativity",
+            "confidence": 0.8,
+            "properties": {
+              "type": "concept",
+              "field": "physics",
+              "year": 1905
+            }
+          }
+        ],
+        "confidence": 0.8,
+        "reasoning_type": "entity_linking"
+      },
+      "reasoning_path": [],
+      "confidence": 0.8,
+      "metadata": {
+        "processing_time": 0.000495,
+        "memory_usage": 0.0002
+      }
+    }
+  },
+  {
+    "task_id": 2,
+    "task": {
+      "type": "relation_prediction",
+      "description": "What is the relationship between Albert Einstein and Theory of Relativity?",
+      "entities": [
+        "Albert_Einstein",
+        "Theory_of_Relativity"
+      ]
+    },
+    "result": {
+      "success": true,
+      "result": {
+        "predictions": [
+          {
+            "relation": "related_to",
+            "score": 0.7
+          },
+          {
+            "relation": "similar_to",
+            "score": 0.5
+          }
+        ],
+        "confidence": 0.7,
+        "reasoning_type": "relation_prediction"
+      },
+      "reasoning_path": [],
+      "confidence": 0.7,
+      "metadata": {
+        "processing_time": 0.000277,
+        "memory_usage": 0.0004
+      }
+    }
+  },
+  {
+    "task_id": 3,
+    "task": {
+      "type": "complex_reasoning",
+      "description": "Explain how Albert Einstein developed the Theory of Relativity",
+      "entities": [
+        "Albert_Einstein",
+        "Theory_of_Relativity"
+      ]
+    },
+    "result": {
+      "success": true,
+      "result": {
+        "result": {
+          "final_conclusion": "reasoning_completed",
+          "confidence": 0.5625,
+          "steps_count": 4
+        },
+        "reasoning_steps": [
+          {
+            "step": 1,
+            "type": "entity_understanding",
+            "result": {
+              "Albert_Einstein": {
+                "type": "entity",
+                "properties": {
+                  "type": "person",
+                  "birth_year": 1879,
+                  "nationality": "German",
+                  "profession": "physicist"
+                },
+                "confidence": 0.8
+              },
+              "Theory_of_Relativity": {
+                "type": "entity",
+                "properties": {
+                  "type": "concept",
+                  "field": "physics",
+                  "year": 1905
+                },
+                "confidence": 0.8
+              }
+            }
+          },
+          {
+            "step": 2,
+            "type": "relation_analysis",
+            "result": {
+              "Albert_Einstein_Theory_of_Relativity": {
+                "relation": "connected",
+                "strength": 0.7,
+                "evidence": [
+                  {
+                    "source": "Albert_Einstein",
+                    "target": "Theory_of_Relativity",
+                    "relation": "developed",
+                    "weight": 1.0
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "step": 3,
+            "type": "logical_reasoning",
+            "result": {
+              "conclusion": "entities_are_related",
+              "evidence": [
+                {
+                  "Albert_Einstein": {
+                    "type": "entity",
+                    "properties": {
+                      "type": "person",
+                      "birth_year": 1879,
+                      "nationality": "German",
+                      "profession": "physicist"
+                    },
+                    "confidence": 0.8
+                  },
+                  "Theory_of_Relativity": {
+                    "type": "entity",
+                    "properties": {
+                      "type": "concept",
+                      "field": "physics",
+                      "year": 1905
+                    },
+                    "confidence": 0.8
+                  }
+                },
+                {
+                  "Albert_Einstein_Theory_of_Relativity": {
+                    "relation": "connected",
+                    "strength": 0.7,
+                    "evidence": [
+                      {
+                        "source": "Albert_Einstein",
+                        "target": "Theory_of_Relativity",
+                        "relation": "developed",
+                        "weight": 1.0
+                      }
+                    ]
+                  }
+                }
+              ],
+              "confidence": 0.75
+            }
+          },
+          {
+            "step": 4,
+            "type": "validation",
+            "result": {
+              "valid": true,
+              "similarity_score": 0.8,
+              "historical_support": false
+            }
+          }
+        ],
+        "confidence": 0.5625,
+        "reasoning_type": "complex_reasoning"
+      },
+      "reasoning_path": [],
+      "confidence": 0.5625,
+      "metadata": {
+        "processing_time": 0.000331,
+        "memory_usage": 0.0006
+      }
+    }
+  }
+]
