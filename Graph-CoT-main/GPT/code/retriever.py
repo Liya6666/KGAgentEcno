@@ -16,55 +16,86 @@ from torch.utils.data import DataLoader, IterableDataset
 from tqdm import tqdm
 import sentence_transformers
 
+from types import SimpleNamespace as Namespace
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from IPython import embed
 
+from bs4 import BeautifulSoup
+
+def clean_html(text):
+    """清理HTML标签"""
+    soup = BeautifulSoup(text, "html.parser")
+    return soup.get_text()
+
+
 NODE_TEXT_KEYS = {'maple': {'paper': ['title'], 'author': ['name'], 'venue': ['name']},
                   'amazon': {'item': ['title'], 'brand': ['name']},
-                  'biomedical': {'Anatomy': ['name'], 'Biological_Process':['name'], 'Cellular_Component':['name'], 'Compound':['name'], 'Disease':['name'], 'Gene':['name'], 'Molecular_Function':['name'], 'Pathway':['name'], 'Pharmacologic_Class':['name'], 'Side_Effect':['name'], 'Symptom':['name']},
-                  'legal': {'opinion': ['plain_text'], 'opinion_cluster': ['syllabus'], 'docket': ['pacer_case_id', 'case_name'], 'court': ['full_name']},
+                  'biomedical': {'Anatomy': ['name'], 'Biological_Process': ['name'], 'Cellular_Component': ['name'],
+                                 'Compound': ['name'], 'Disease': ['name'], 'Gene': ['name'],
+                                 'Molecular_Function': ['name'], 'Pathway': ['name'], 'Pharmacologic_Class': ['name'],
+                                 'Side_Effect': ['name'], 'Symptom': ['name']},
+                  'legal': {'opinion': ['plain_text'], 'opinion_cluster': ['syllabus'],
+                            'docket': ['pacer_case_id', 'case_name'], 'court': ['full_name']},
                   'goodreads': {'book': ['title'], 'author': ['name'], 'publisher': ['name'], 'series': ['title']},
                   'dblp': {'paper': ['title'], 'author': ['name', 'organization'], 'venue': ['name']}
                   }
 
-RELATION_NODE_TYPE_MAP = {'maple': {'author': 'author', 'venue': 'venue', 'reference': 'paper', 'cited_by': 'paper', 'paper': 'paper'},
-                          'amazon': {'also_viewed_item': 'item', 'buy_after_viewing_item': 'item', 'also_bought_item': 'item', 'bought_together_item': 'item', 'brand': 'brand', 'item': 'item'},
-                          'biomedical': {'Disease-localizes-Anatomy': ['Anatomy', 'Disease'], 'Anatomy-expresses-Gene': ['Anatomy', 'Gene'],
-                                         'Anatomy-downregulates-Gene': ['Anatomy', 'Gene'], 'Anatomy-upregulates-Gene': ['Anatomy', 'Gene'],
-                                         'Gene-participates-Biological Process': ['Biological_Process', 'Gene'],
-                                         'Gene-participates-Cellular Component': ['Cellular_Component', 'Gene'],
-                                         'Compound-causes-Side Effect': ['Compound', 'Side_Effect'],
-                                         'Compound-resembles-Compound': ['Compound'], 'Compound-binds-Gene': ['Compound', 'Gene'],
-                                         'Compound-downregulates-Gene': ['Compound', 'Gene'], 'Compound-palliates-Disease': ['Compound', 'Disease'],
-                                         'Pharmacologic Class-includes-Compound': ['Compound', 'Pharmacologic_Class'],
-                                         'Compound-upregulates-Gene': ['Compound', 'Gene'], 'Compound-treats-Disease': ['Compound', 'Disease'],
-                                         'Disease-upregulates-Gene': ['Disease', 'Gene'], 'Disease-downregulates-Gene': ['Disease', 'Gene'],
-                                         'Disease-associates-Gene': ['Disease', 'Gene'], 'Disease-presents-Symptom': ['Disease', 'Symptom'],
-                                         'Disease-resembles-Disease': ['Disease'], 'Gene-regulates-Gene': ['Gene'], 'Gene-interacts-Gene': ['Gene'],
-                                         'Gene-participates-Pathway': ['Gene', 'Pathway'], 'Gene-participates-Molecular Function': ['Gene', 'Molecular_Function'],
-                                         'Gene-covaries-Gene': ['Gene']},
-                          'legal': {'opinion_cluster': 'opinion_cluster', 'reference': 'opinion', 'cited_by': 'opinion', 'opinion': 'opinion', 'docket': 'docket', 'court': 'court'},
-                          'goodreads': {'author': 'author', 'publisher': 'publisher', 'series': 'series', 'similar_books': 'book', 'book': 'book'},
-                          'dblp': {'author': 'author', 'venue': 'venue', 'reference': 'paper', 'cited_by': 'paper', 'paper': 'paper'}
-                          }
+RELATION_NODE_TYPE_MAP = {
+    'maple': {'author': 'author', 'venue': 'venue', 'reference': 'paper', 'cited_by': 'paper', 'paper': 'paper'},
+    'amazon': {'also_viewed_item': 'item', 'buy_after_viewing_item': 'item', 'also_bought_item': 'item',
+               'bought_together_item': 'item', 'brand': 'brand', 'item': 'item'},
+    'biomedical': {'Disease-localizes-Anatomy': ['Anatomy', 'Disease'], 'Anatomy-expresses-Gene': ['Anatomy', 'Gene'],
+                   'Anatomy-downregulates-Gene': ['Anatomy', 'Gene'], 'Anatomy-upregulates-Gene': ['Anatomy', 'Gene'],
+                   'Gene-participates-Biological Process': ['Biological_Process', 'Gene'],
+                   'Gene-participates-Cellular Component': ['Cellular_Component', 'Gene'],
+                   'Compound-causes-Side Effect': ['Compound', 'Side_Effect'],
+                   'Compound-resembles-Compound': ['Compound'], 'Compound-binds-Gene': ['Compound', 'Gene'],
+                   'Compound-downregulates-Gene': ['Compound', 'Gene'],
+                   'Compound-palliates-Disease': ['Compound', 'Disease'],
+                   'Pharmacologic Class-includes-Compound': ['Compound', 'Pharmacologic_Class'],
+                   'Compound-upregulates-Gene': ['Compound', 'Gene'],
+                   'Compound-treats-Disease': ['Compound', 'Disease'],
+                   'Disease-upregulates-Gene': ['Disease', 'Gene'], 'Disease-downregulates-Gene': ['Disease', 'Gene'],
+                   'Disease-associates-Gene': ['Disease', 'Gene'], 'Disease-presents-Symptom': ['Disease', 'Symptom'],
+                   'Disease-resembles-Disease': ['Disease'], 'Gene-regulates-Gene': ['Gene'],
+                   'Gene-interacts-Gene': ['Gene'],
+                   'Gene-participates-Pathway': ['Gene', 'Pathway'],
+                   'Gene-participates-Molecular Function': ['Gene', 'Molecular_Function'],
+                   'Gene-covaries-Gene': ['Gene']},
+    'legal': {'opinion_cluster': 'opinion_cluster', 'reference': 'opinion', 'cited_by': 'opinion', 'opinion': 'opinion',
+              'docket': 'docket', 'court': 'court'},
+    'goodreads': {'author': 'author', 'publisher': 'publisher', 'series': 'series', 'similar_books': 'book',
+                  'book': 'book'},
+    'dblp': {'author': 'author', 'venue': 'venue', 'reference': 'paper', 'cited_by': 'paper', 'paper': 'paper'}
+    }
 
 FEATURE_NODE_TYPE = {'maple': {'paper': ['title'], 'author': ['name'], 'venue': ['name']},
-                  'amazon': {'item': ['title', 'price', 'category'], 'brand': ['name']},
-                  'biomedical': {'Anatomy': ['name'], 'Biological_Process':['name'], 'Cellular_Component':['name'], 'Compound':['name'], 'Disease':['name'], 'Gene':['name'], 'Molecular_Function':['name'], 'Pathway':['name'], 'Pharmacologic_Class':['name'], 'Side_Effect':['name'], 'Symptom':['name']},
-                  'legal': {'opinion': ['plain_text'], 'opinion_cluster': ['syllabus', 'judges'], 'docket': ['pacer_case_id', 'case_name'], 'court': ['full_name', 'start_date', 'end_date', 'citation_string']},
-                  'goodreads': {'book': ['title', 'popular_shelves', 'genres', 'publication_year', 'num_pages', 'is_ebook', 'language_code', 'format'], 'author': ['name'], 'publisher': ['name'], 'series': ['title']},
-                  'dblp': {'paper': ['title'], 'author': ['name', 'organization'], 'venue': ['name']}
-                  }
+                     'amazon': {'item': ['title', 'price', 'category'], 'brand': ['name']},
+                     'biomedical': {'Anatomy': ['name'], 'Biological_Process': ['name'], 'Cellular_Component': ['name'],
+                                    'Compound': ['name'], 'Disease': ['name'], 'Gene': ['name'],
+                                    'Molecular_Function': ['name'], 'Pathway': ['name'],
+                                    'Pharmacologic_Class': ['name'], 'Side_Effect': ['name'], 'Symptom': ['name']},
+                     'legal': {'opinion': ['plain_text'], 'opinion_cluster': ['syllabus', 'judges'],
+                               'docket': ['pacer_case_id', 'case_name'],
+                               'court': ['full_name', 'start_date', 'end_date', 'citation_string']},
+                     'goodreads': {
+                         'book': ['title', 'popular_shelves', 'genres', 'publication_year', 'num_pages', 'is_ebook',
+                                  'language_code', 'format'], 'author': ['name'], 'publisher': ['name'],
+                         'series': ['title']},
+                     'dblp': {'paper': ['title'], 'author': ['name', 'organization'], 'venue': ['name']}
+                     }
+
 
 class Retriever:
 
     def __init__(self, args, graph, cache=True, cache_dir=None):
         logger.info("Initializing retriever")
 
-        self.dataset = args.dataset
-        self.use_gpu = args.faiss_gpu
+        self.dataset = "amazon"
+        self.use_gpu = args.faiss_gpu  # 从args中获取use_gpu
         self.node_text_keys = args.node_text_keys
         self.model_name = args.embedder_name
         self.model = sentence_transformers.SentenceTransformer(args.embedder_name)
@@ -75,19 +106,25 @@ class Retriever:
         self.reset()
 
     def reset(self):
+        # 确保缓存文件夹存在
+        if not os.path.exists(self.cache_dir):
+            os.makedirs(self.cache_dir)
+            logger.info(f"Created cache directory: {self.cache_dir}")
 
         docs, ids, meta_type = self.process_graph()
         save_model_name = self.model_name.split('/')[-1]
 
         if self.cache and os.path.isfile(os.path.join(self.cache_dir, f'cache-{save_model_name}.pkl')):
-            embeds, self.doc_lookup, self.doc_type = pickle.load(open(os.path.join(self.cache_dir, f'cache-{save_model_name}.pkl'), 'rb'))
+            embeds, self.doc_lookup, self.doc_type = pickle.load(
+                open(os.path.join(self.cache_dir, f'cache-{save_model_name}.pkl'), 'rb'))
             assert self.doc_lookup == ids
             assert self.doc_type == meta_type
         else:
             embeds = self.multi_gpu_infer(docs)
             self.doc_lookup = ids
             self.doc_type = meta_type
-            pickle.dump([embeds, ids, meta_type], open(os.path.join(self.cache_dir, f'cache-{save_model_name}.pkl'), 'wb'))
+            pickle.dump([embeds, ids, meta_type],
+                        open(os.path.join(self.cache_dir, f'cache-{save_model_name}.pkl'), 'wb'))
 
         self.init_index_and_add(embeds)
 
@@ -104,10 +141,13 @@ class Retriever:
                 for k in self.node_text_keys[node_type]:
                     vv = self.graph[node_type_key][nid]['features'][k]
                     tmp_string += k + ": " + str(vv) + '. ' if (isinstance(vv, str) or not math.isnan(vv)) else ''
-                # docs.append(self.graph[node_type_key][nid]['features'][self.node_text_keys[node_type][0]])
                 docs.append(tmp_string)
                 ids.append(nid)
                 meta_type.append(node_type)
+
+                # Debug: Check the generated text for each node
+                if len(tmp_string) < 50:  # If the generated string is too short
+                    logger.info(f"Short context for {nid}: {tmp_string}")
         return docs, ids, meta_type
 
     def multi_gpu_infer(self, docs):
@@ -138,7 +178,6 @@ class Retriever:
         self.index = faiss.index_cpu_to_gpu_multiple(vres, vdev, self.index, co)
 
     def init_index_and_add(self, embeds):
-        
         logger.info("Initialize the index...")
         dim = embeds.shape[1]
         self._initialize_faiss_index(dim)
@@ -169,13 +208,12 @@ class Retriever:
         self.query_lookup = []
 
     def search_single(self, query, hop=1, topk=10):
-        # logger.info("Searching")
         if self.index is None:
             raise ValueError("Index is not initialized")
-        
+
         query_embed = self.model.encode(query, show_progress_bar=False)
 
-        D, I = self.index.search(query_embed[None,:], topk)
+        D, I = self.index.search(query_embed[None, :], topk)
         original_indice = np.array(self.doc_lookup)[I].tolist()[0][0]
         original_type = np.array(self.doc_type)[I].tolist()[0][0]
 
@@ -188,6 +226,14 @@ class Retriever:
         else:
             raise ValueError('Ego graph should be 0-hop, 1-hop or 2-hop.')
 
+        # Ensure result is being saved correctly
+        result = {'query': query, 'context': context}
+
+        # Save to file
+        result_filename = '/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/GPT/results/GPT_retriever_results.json'
+        with open(result_filename, 'w') as f:
+            json.dump(result, f, indent=4)
+
         return context
 
     def linearize_feature(self, node_type, node_indice):
@@ -195,30 +241,36 @@ class Retriever:
         for f_name in self.graph[f'{node_type}_nodes'][node_indice]['features']:
             if f_name in FEATURE_NODE_TYPE[self.dataset][node_type]:
                 val = self.graph[f'{node_type}_nodes'][node_indice]['features'][f_name]
+
+                # 清理 title 中的 HTML 标签
+                if f_name == 'title' and isinstance(val, str):
+                    val = clean_html(val)
+
+                # 如果 val 是空的，提供默认值
+                if isinstance(val, str) and not val.strip():
+                    val = f"No {f_name}"
+                elif isinstance(val, list) and not val:
+                    val = f"No {f_name}"
+                elif isinstance(val, float) and math.isnan(val):
+                    val = f"No {f_name}"
+
+                # 拼接文本
                 if isinstance(val, str):
-                    text += f_name + ': ' + val + '. '
+                    text += f"{f_name}: {val}. "
                 elif isinstance(val, float):
-                    text += f_name + ': ' + str(val) + '. '
-                elif isinstance(val, List):
-                    text += f_name + ': ' + ', '.join(val) + '. '
-                elif math.isnan(val):
-                    continue
-                else:
-                    print(val)
-                    raise ValueError('Something is wrong here!')
+                    text += f"{f_name}: {str(val)}. "
+                elif isinstance(val, list):
+                    text += f"{f_name}: {', '.join(val)}. "
         return text
 
     def zero_hop(self, node_type, node_indice):
         context = 'Center node: '
-        # add feature
         context += self.linearize_feature(node_type, node_indice)
         return context
 
     def one_hop(self, node_type, node_indice, sample_n=20):
         context = 'Center node: '
-        # add feature
         context += self.linearize_feature(node_type, node_indice)
-        # add neighbor info
         for neighbor_type in self.graph[f'{node_type}_nodes'][node_indice]['neighbors']:
             context += neighbor_type + ': '
             for nid in self.graph[f'{node_type}_nodes'][node_indice]['neighbors'][neighbor_type][:sample_n]:
@@ -235,14 +287,12 @@ class Retriever:
                             pass
                 else:
                     raise ValueError('Something is going wrong here.')
-        
+
         return context
 
     def two_hop(self, node_type, node_indice, sample_n=20):
         context = 'Center node: '
-        # add feature
         context += self.linearize_feature(node_type, node_indice)
-        # add neighbor info
         for neighbor_type in self.graph[f'{node_type}_nodes'][node_indice]['neighbors']:
             context += neighbor_type + ': '
             for nid in self.graph[f'{node_type}_nodes'][node_indice]['neighbors'][neighbor_type][:sample_n]:
@@ -254,13 +304,38 @@ class Retriever:
 
 
 if __name__ == '__main__':
-    model_name = "sentence-transformers/all-mpnet-base-v2"
-    graph_dir = "/home/ec2-user/quic-efs/user/bowenjin/llm-graph-plugin/data/processed_data/maple/Physics/graph.json"
-    node_text_keys = {'paper': ['title'], 'author': ['name'], 'venue': ['name']}
+    # ====== 构造 args ======
+    args = Namespace(
+        faiss_gpu=False,                               # 是否用 GPU
+        node_text_keys=NODE_TEXT_KEYS['amazon'],       # 用 amazon 的 text keys
+        embedder_name="sentence-transformers/all-mpnet-base-v2",
+        embed_cache=True,
+        embed_cache_dir="./cache"
+    )
 
+    graph_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/amazon_magzine_graph.json"
     query = "quantum physics and machine learning"
 
     graph = json.load(open(graph_dir))
-    node_retriever = Retriever(graph, model_name, node_text_keys, use_gpu=False)
-    idd, node = node_retriever.search_single(query, 1)
-    print(idd, node)
+    node_retriever = Retriever(args, graph)
+
+    # 执行查询
+    context = node_retriever.search_single(query, 1)
+    print(context)
+
+    # ====== 创建文件夹 (如果不存在) ======
+    results_folder = '/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/GPT/results'  # 在当前目录下创建 results 文件夹
+    os.makedirs(results_folder, exist_ok=True)
+
+    # ====== 确保结果保存到正确的文件路径 ======
+    result_filename = os.path.join(results_folder, 'GPT_retriever_results.json')  # 结果保存为 GPT_retriever_results.json
+
+    # ====== 创建结果字典并保存 ======
+    result = {'query': query, 'context': context}
+
+    # 保存查询结果到文件
+    with open(result_filename, 'w') as f:
+        json.dump(result, f, indent=4)
+
+    print(f"Results saved to {result_filename}")
+

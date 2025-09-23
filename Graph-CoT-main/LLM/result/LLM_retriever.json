@@ -1,0 +1,7 @@
+{
+  "query": "quantum physics and machine learning",
+  "result": "Center node: name: Quantum%Ruben Svirsky. item: title: <span class=\"a-size-medium a-color-secondary\". price: . category: . ",
+  "dataset": "amazon",
+  "embedder_name": "sentence-transformers/all-mpnet-base-v2",
+  "hop": 1
+}

@@ -25,10 +25,12 @@ from IPython import embed
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def clean_str(string):
     pattern = re.compile(r'^\d+\. ', flags=re.MULTILINE)
     string = pattern.sub('', string)
     return string.strip()
+
 
 def read_jsonl_lines(file):
     context = []
@@ -38,6 +40,7 @@ def read_jsonl_lines(file):
             # context.add(line.strip())
             context.append(json.loads(line.strip())['context'])
     return context
+
 
 def save_jsonl_lines(file, contexts):
     with open(file, 'w') as fout:
@@ -49,7 +52,7 @@ def save_jsonl_lines(file, contexts):
 def main():
     parser = argparse.ArgumentParser("")
     parser.add_argument("--dataset", type=str, default="flights")
-    parser.add_argument("--version", type=str, default="meta-llama/Llama-2-13b-chat-hf")
+    parser.add_argument("--version", type=str, default="microsoft/DialoGPT-medium")
     # parser.add_argument("--retriever", type=str, default="meta-llama/Llama-2-13b-chat-hf")
     parser.add_argument("--graph_dir", type=str, default="None")
     parser.add_argument("--path", type=str, default="None")
@@ -64,29 +67,46 @@ def main():
 
     args = parser.parse_args()
 
-    assert args.version in ["meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-7b-chat-hf", "meta-llama/Llama-2-13b-hf", 
-                            "meta-llama/Llama-2-13b-chat-hf", "meta-llama/Llama-2-70b-hf", "meta-llama/Llama-2-70b-chat-hf",
-                            "allenai/open-instruct-stanford-alpaca-7b", "mistralai/Mixtral-8x7B-Instruct-v0.1"]
+    # 使用不需要token的开源模型
+    allowed_models = ["microsoft/DialoGPT-medium", "microsoft/DialoGPT-large", "gpt2", "gpt2-medium",
+                      "gpt2-large", "gpt2-xl", "distilgpt2", "facebook/opt-350m", "facebook/opt-1.3b",
+                      "allenai/open-instruct-stanford-alpaca-7b", "mistralai/Mixtral-8x7B-Instruct-v0.1"]
 
-    args.embed_cache_dir = args.path
-    args.graph_dir = os.path.join(args.path, "graph.json")
-    args.data_dir = os.path.join(args.path, "data.json")
-    args.retrieval_context_dir = os.path.join(args.path, f"retrieval_context_{args.retrieve_graph_hop}.json")
+    if args.version not in allowed_models:
+        print(f"Warning: {args.version} may require authentication. Using microsoft/DialoGPT-medium instead.")
+        args.version = "microsoft/DialoGPT-medium"
+
+    # 修改路径设置
+    args.embed_cache_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon"
+    args.graph_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/amazon_magzine_graph.json"
+    args.data_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/data.json"
+    args.retrieval_context_dir = f"/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/retrieval_context_{args.retrieve_graph_hop}.json"
+    args.save_file = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/LLM/result/run_LLM_rag_results.json"
+
+    # 设置dataset为amazon以获取正确的node_text_keys
+    args.dataset = "amazon"
     args.node_text_keys = NODE_TEXT_KEYS[args.dataset]
 
     # model = f"meta-llama/{args.version}"
     model = args.version
-    tokenizer = AutoTokenizer.from_pretrained(model, use_auth_token=True)
+    tokenizer = AutoTokenizer.from_pretrained(model)
+
+    # 添加pad_token如果不存在
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
     pipeline = transformers.pipeline(
         "text-generation",
         model=model,
+        tokenizer=tokenizer,
         torch_dtype=torch.float16,
         device_map="auto"
     )
 
     # truncate
     def truncate_string(input_text, tokenizer, max_len):
-        return tokenizer.decode(tokenizer.encode(input_text, add_special_tokens=False, truncation=True, max_length=max_len))
+        return tokenizer.decode(
+            tokenizer.encode(input_text, add_special_tokens=False, truncation=True, max_length=max_len))
 
     # file_path = "/home/ec2-user/quic-efs/user/bowenjin/llm-graph-plugin/data/processed_data/maple/Physics/data.json"
     file_path = args.data_dir
@@ -101,18 +121,19 @@ def main():
         logger.info('Loading the graph...')
         graph = json.load(open(args.graph_dir))
         retriever = Retriever(args, graph)
-        
+
         logger.info('Retrieving...')
         for item in tqdm(contents):
             message = item["question"]
-            context = truncate_string(retriever.search_single(query=message, hop=args.retrieve_graph_hop, topk=1), tokenizer, args.graph_max_len)
+            context = truncate_string(retriever.search_single(query=message, hop=args.retrieve_graph_hop, topk=1),
+                                      tokenizer, args.graph_max_len)
             contexts.append(context)
         save_jsonl_lines(args.retrieval_context_dir, contexts)
     else:
         logger.info('Loading previous retrieved context...')
         contexts = read_jsonl_lines(args.retrieval_context_dir)
     assert len(contexts) == len(contents)
-    
+
     # inference
     system_message = "You are an AI assistant to answer questions. Please use your own knowledge to answer the questions. If you do not know the answer, please guess a most probable answer. Only include the answer in your response. Do not explain.\nQuestion: "
     response = []
@@ -123,33 +144,36 @@ def main():
         # context = truncate_string(retriever.search_single(query=message, hop=args.retrieve_graph_hop, topk=1), tokenizer, args.graph_max_len)
         message = system_message + message + '\nContext: ' + context + '\nAnswer: '
         msg_list = pipeline(
-                        message,
-                        do_sample=True,
-                        top_k=10,
-                        num_return_sequences=1,
-                        eos_token_id=tokenizer.eos_token_id,
-                        max_length=args.max_len,
-                    )
+            message,
+            do_sample=True,
+            top_k=10,
+            num_return_sequences=1,
+            eos_token_id=tokenizer.eos_token_id,
+            max_length=args.max_len,
+        )
         # response.append(msg_list[0]["generated_text"])
         response.append((msg_list[0]["generated_text"].split(message)[-1], context))
 
     generated_text = []
     for j in range(len(response)):
-        generated_text.append({"question": contents[j]["question"], "context": response[j][1], "model_answer": response[j][0], "gt_answer": contents[j]["answer"]})
+        generated_text.append(
+            {"question": contents[j]["question"], "context": response[j][1], "model_answer": response[j][0],
+             "gt_answer": contents[j]["answer"]})
 
     print(generated_text[0], len(generated_text))
     output_file_path = args.save_file
-    
+
     parent_folder = os.path.dirname(output_file_path)
     parent_parent_folder = os.path.dirname(parent_folder)
     if not os.path.exists(parent_parent_folder):
         os.mkdir(parent_parent_folder)
     if not os.path.exists(parent_folder):
         os.mkdir(parent_folder)
-    
+
     with jsonlines.open(output_file_path, 'w') as writer:
         for row in generated_text:
             writer.write(row)
+
 
 if __name__ == '__main__':
     main()

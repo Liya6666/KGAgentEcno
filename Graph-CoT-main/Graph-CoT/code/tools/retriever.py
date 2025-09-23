@@ -22,11 +22,16 @@ from IPython import embed
 
 NODE_TEXT_KEYS = {'maple': {'paper': ['title'], 'author': ['name'], 'venue': ['name']},
                   'amazon': {'item': ['title'], 'brand': ['name']},
-                  'biomedical': {'Anatomy': ['name'], 'Biological_Process':['name'], 'Cellular_Component':['name'], 'Compound':['name'], 'Disease':['name'], 'Gene':['name'], 'Molecular_Function':['name'], 'Pathway':['name'], 'Pharmacologic_Class':['name'], 'Side_Effect':['name'], 'Symptom':['name']},
-                  'legal': {'opinion': ['plain_text'], 'opinion_cluster': ['syllabus'], 'docket': ['pacer_case_id', 'case_name'], 'court': ['full_name']},
+                  'biomedical': {'Anatomy': ['name'], 'Biological_Process': ['name'], 'Cellular_Component': ['name'],
+                                 'Compound': ['name'], 'Disease': ['name'], 'Gene': ['name'],
+                                 'Molecular_Function': ['name'], 'Pathway': ['name'], 'Pharmacologic_Class': ['name'],
+                                 'Side_Effect': ['name'], 'Symptom': ['name']},
+                  'legal': {'opinion': ['plain_text'], 'opinion_cluster': ['syllabus'],
+                            'docket': ['pacer_case_id', 'case_name'], 'court': ['full_name']},
                   'goodreads': {'book': ['title'], 'author': ['name'], 'publisher': ['name'], 'series': ['title']},
                   'dblp': {'paper': ['title'], 'author': ['name', 'organization'], 'venue': ['name']}
                   }
+
 
 class Retriever:
 
@@ -49,14 +54,16 @@ class Retriever:
         save_model_name = self.model_name.split('/')[-1]
 
         if self.cache and os.path.isfile(os.path.join(self.cache_dir, f'cache-{save_model_name}.pkl')):
-            embeds, self.doc_lookup, self.doc_type = pickle.load(open(os.path.join(self.cache_dir, f'cache-{save_model_name}.pkl'), 'rb'))
+            embeds, self.doc_lookup, self.doc_type = pickle.load(
+                open(os.path.join(self.cache_dir, f'cache-{save_model_name}.pkl'), 'rb'))
             assert self.doc_lookup == ids
             assert self.doc_type == meta_type
         else:
             embeds = self.multi_gpu_infer(docs)
             self.doc_lookup = ids
             self.doc_type = meta_type
-            pickle.dump([embeds, ids, meta_type], open(os.path.join(self.cache_dir, f'cache-{save_model_name}.pkl'), 'wb'))
+            pickle.dump([embeds, ids, meta_type],
+                        open(os.path.join(self.cache_dir, f'cache-{save_model_name}.pkl'), 'wb'))
 
         self.init_index_and_add(embeds)
 
@@ -102,7 +109,7 @@ class Retriever:
         self.index = faiss.index_cpu_to_gpu_multiple(vres, vdev, self.index, co)
 
     def init_index_and_add(self, embeds):
-        
+
         logger.info("Initialize the index...")
         dim = embeds.shape[1]
         self._initialize_faiss_index(dim)
@@ -136,24 +143,55 @@ class Retriever:
         # logger.info("Searching")
         if self.index is None:
             raise ValueError("Index is not initialized")
-        
+
         query_embed = self.model.encode(query, show_progress_bar=False)
 
-        D, I = self.index.search(query_embed[None,:], topk)
+        D, I = self.index.search(query_embed[None, :], topk)
         original_indice = np.array(self.doc_lookup)[I].tolist()[0][0]
         original_type = np.array(self.doc_type)[I].tolist()[0][0]
 
         return original_indice, self.graph[f'{original_type}_nodes'][original_indice]
 
 
+class Args:
+    def __init__(self):
+        self.faiss_gpu = False
+        self.node_text_keys = NODE_TEXT_KEYS['amazon']
+        self.embedder_name = "sentence-transformers/all-mpnet-base-v2"
+        self.embed_cache = True
+        self.embed_cache_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/GraphCoT/cache"
+
+
 if __name__ == '__main__':
     model_name = "sentence-transformers/all-mpnet-base-v2"
-    graph_dir = "/home/ec2-user/quic-efs/user/bowenjin/llm-graph-plugin/data/processed_data/maple/Physics/graph.json"
-    node_text_keys = {'paper': ['title'], 'author': ['name'], 'venue': ['name']}
+    graph_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/amazon_magzine_graph.json"
+    node_text_keys = NODE_TEXT_KEYS['amazon']
+    results_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/Graph-CoT/results"
+    results_file = "CoT_retriever_result.json"
 
-    query = "quantum physics and machine learning"
+    query = "magazine recommendation"
 
+    # Create directories if they don't exist
+    os.makedirs(os.path.dirname(results_dir), exist_ok=True)
+    os.makedirs(results_dir, exist_ok=True)
+    os.makedirs("/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/GraphCoT/cache", exist_ok=True)
+
+    args = Args()
     graph = json.load(open(graph_dir))
-    node_retriever = Retriever(graph, model_name, node_text_keys, use_gpu=False)
+    node_retriever = Retriever(args, graph)
     idd, node = node_retriever.search_single(query, 1)
-    print(idd, node)
+
+    # Save results
+    result = {
+        "query": query,
+        "node_id": idd,
+        "node_data": node
+    }
+
+    result_path = os.path.join(results_dir, results_file)
+    with open(result_path, 'w', encoding='utf-8') as f:
+        json.dump(result, f, indent=2, ensure_ascii=False)
+
+    print(f"Results saved to: {result_path}")
+    print(f"Node ID: {idd}")
+    print(f"Node data: {node}")

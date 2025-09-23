@@ -21,10 +21,10 @@ current_datetime = datetime.datetime.now()
 datetime_string = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
 
 parser = argparse.ArgumentParser("")
-parser.add_argument("--dataset", type=str, default="dblp")
-parser.add_argument("--openai_api_key", type=str, default="xxx")
-parser.add_argument("--path", type=str)
-parser.add_argument("--save_file", type=str)
+parser.add_argument("--dataset", type=str, default="amazon")
+parser.add_argument("--openai_api_key", type=str, default="sk-dffc730848234fc3be92bf457ce88955")
+parser.add_argument("--path", type=str, default="/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/")
+parser.add_argument("--save_file", type=str, default="/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/Graph-CoT/results/CoT_run_result.json")
 parser.add_argument("--embedder_name", type=str, default="sentence-transformers/all-mpnet-base-v2")
 parser.add_argument("--faiss_gpu", type=bool, default=False)
 parser.add_argument("--embed_cache", type=bool, default=True)
@@ -32,17 +32,18 @@ parser.add_argument("--max_steps", type=int, default=15)
 parser.add_argument("--zero_shot", type=bool, default=False)
 parser.add_argument("--ref_dataset", type=str, default=None)
 
-parser.add_argument("--llm_version", type=str, default="gpt-3.5-turbo")
+parser.add_argument("--llm_version", type=str, default="deepseek-chat")
+parser.add_argument("--api_base", type=str, default="https://api.deepseek.com")
 args = parser.parse_args()
 
 args.embed_cache_dir = args.path
-args.graph_dir = os.path.join(args.path, "graph.json")
+args.graph_dir = os.path.join(args.path, "amazon_magzine_graph.json")
 args.data_dir = os.path.join(args.path, "data.json")
 # args.data_dir = os.path.join(args.path, "data_subset.json")
 args.node_text_keys = NODE_TEXT_KEYS[args.dataset]
 args.ref_dataset = args.dataset if not args.ref_dataset else args.ref_dataset
 
-assert args.llm_version in ['gpt-3.5-turbo', 'gpt-4', 'gpt-3.5-turbo-1106', 'gpt-3.5-turbo-16k', "mistralai/Mixtral-8x7B-Instruct-v0.1", "meta-llama/Llama-2-13b-chat-hf"]
+assert args.llm_version in ['gpt-3.5-turbo', 'gpt-4', 'gpt-3.5-turbo-1106', 'gpt-3.5-turbo-16k', "mistralai/Mixtral-8x7B-Instruct-v0.1", "meta-llama/Llama-2-13b-chat-hf", "deepseek-chat", "deepseek-coder"]
 
 def remove_fewshot(prompt: str) -> str:
     # prefix = prompt.split('Here are some examples:')[0]
@@ -54,6 +55,9 @@ def remove_fewshot(prompt: str) -> str:
 def main():
 
     os.environ["OPENAI_API_KEY"] = args.openai_api_key
+    # 如果使用DeepSeek，设置API base URL
+    if "deepseek" in args.llm_version:
+        os.environ["OPENAI_API_BASE"] = args.api_base
     with open(args.data_dir, 'r') as f:
         contents = []
         for item in jsonlines.Reader(f):

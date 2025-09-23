@@ -1,0 +1,22 @@
+{
+  "query": "magazine recommendation",
+  "node_id": "B0018L5RJY",
+  "node_data": {
+    "features": {
+      "title": " Magazines\" />",
+      "description": [],
+      "price": "",
+      "img": "",
+      "category": []
+    },
+    "neighbors": {
+      "also_viewed_item": [],
+      "buy_after_viewing_item": [],
+      "also_bought_item": [],
+      "bought_together_item": [],
+      "brand": [
+        "brand_478"
+      ]
+    }
+  }
+}
