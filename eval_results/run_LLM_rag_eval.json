@@ -1,0 +1,10 @@
+{
+  "model": "None",
+  "exact_match": 0.0,
+  "bleu": 9.157129673762917e-16,
+  "rouge1": 0.0,
+  "rouge2": 0.0,
+  "rougeL": 0.0,
+  "rougeLsum": 0.0,
+  "gpt4_score": 0.005649717514124294
+}
