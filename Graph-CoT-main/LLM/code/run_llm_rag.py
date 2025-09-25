@@ -78,8 +78,8 @@ def main():
 
     # 修改路径设置
     args.embed_cache_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon"
-    args.graph_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/amazon_magzine_graph.json"
-    args.data_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/data.json"
+    args.graph_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/magazine_graph.json"
+    args.data_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/new_data.json"
     args.retrieval_context_dir = f"/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/retrieval_context_{args.retrieve_graph_hop}.json"
     args.save_file = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/LLM/result/run_LLM_rag_results.json"
 

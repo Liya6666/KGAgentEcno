@@ -102,8 +102,8 @@ def main():
     # 设置你指定的路径
     args.path = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon"
     args.embed_cache_dir = args.path
-    args.graph_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/amazon_magzine_graph.json"
-    args.data_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/data.json"
+    args.graph_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/magazine_graph.json"
+    args.data_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/new_data.json"
     args.save_file = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/GPT/results/run_GPT_rag_results.json"
     args.retrieval_context_dir = os.path.join(args.path, f"retrieval_context_{args.retrieve_graph_hop}.json")
     args.node_text_keys = NODE_TEXT_KEYS[args.dataset]

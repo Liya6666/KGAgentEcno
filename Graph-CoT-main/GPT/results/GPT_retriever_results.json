@@ -1,4 +1,11 @@
 {
-    "query": "Given this request: mares prestige octopus, what is the supplementary item?",
-    "context": "Center node: title: Herb Companion. price: No price. category: No category. also_viewed_item: buy_after_viewing_item: also_bought_item: bought_together_item: brand: "
+    "query": "What is the clustering coefficient of the magazine network for category Science Fiction?",
+    "context": "Center node: name: Best Publications. \nitem: title: No title. price: No price. category: Magazine Subscriptions, Newsletters. ",
+    "top_matches": [
+        {
+            "node_id": "brand_584",
+            "node_type": "brand",
+            "score": 0.36296534538269043
+        }
+    ]
 }

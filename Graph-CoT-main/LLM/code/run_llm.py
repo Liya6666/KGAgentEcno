@@ -30,7 +30,7 @@ def main():
     parser = argparse.ArgumentParser("")
     parser.add_argument("--version", type=str, default="microsoft/DialoGPT-medium")
     parser.add_argument("--data_file", type=str,
-                        default="/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/data.json")
+                        default="/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/new_data.json")
     parser.add_argument("--save_file", type=str,
                         default="/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/LLM/result/run_LLM_results.json")
     args = parser.parse_args()

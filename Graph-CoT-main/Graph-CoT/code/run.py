@@ -37,8 +37,8 @@ parser.add_argument("--api_base", type=str, default="https://api.deepseek.com")
 args = parser.parse_args()
 
 args.embed_cache_dir = args.path
-args.graph_dir = os.path.join(args.path, "amazon_magzine_graph.json")
-args.data_dir = os.path.join(args.path, "data.json")
+args.graph_dir = os.path.join(args.path, "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/magazine_graph.json")
+args.data_dir = os.path.join(args.path, "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/new_data.json")
 # args.data_dir = os.path.join(args.path, "data_subset.json")
 args.node_text_keys = NODE_TEXT_KEYS[args.dataset]
 args.ref_dataset = args.dataset if not args.ref_dataset else args.ref_dataset

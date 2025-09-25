@@ -1,6 +1,6 @@
 {
   "query": "quantum physics and machine learning",
-  "result": "Center node: name: Quantum%Ruben Svirsky. item: title: <span class=\"a-size-medium a-color-secondary\". price: . category: . ",
+  "result": "Center node: name: Quantum%Ruben Svirsky. item: title: <span class=\"a-size-medium a-color-secondary\". price: . category: Magazine Subscriptions, Professional &amp; Educational Journals, Professional &amp; Trade, Humanities &amp; Social Sciences, Economics &amp; Economic Theory. ",
   "dataset": "amazon",
   "embedder_name": "sentence-transformers/all-mpnet-base-v2",
   "hop": 1

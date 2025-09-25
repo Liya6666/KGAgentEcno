@@ -289,7 +289,7 @@ if __name__ == '__main__':
     args.embed_cache = True
     args.embed_cache_dir = "/tmp"  # 设置缓存目录
 
-    graph_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/amazon_magzine_graph.json"
+    graph_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/magazine_graph.json"
     query = "quantum physics and machine learning"
 
     graph = json.load(open(graph_dir))

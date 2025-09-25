@@ -164,7 +164,7 @@ class Args:
 
 if __name__ == '__main__':
     model_name = "sentence-transformers/all-mpnet-base-v2"
-    graph_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/amazon_magzine_graph.json"
+    graph_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/magazine_graph.json"
     node_text_keys = NODE_TEXT_KEYS['amazon']
     results_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/Graph-CoT/results"
     results_file = "CoT_retriever_result.json"

@@ -71,7 +71,7 @@ def main():
     parser.add_argument("--dataset", type=str, default="amazon")
     # 默认改成 deepseek-chat；并放宽可选模型范围以支持 deepseek
     parser.add_argument("--gpt_version", type=str, default="deepseek-chat")
-    parser.add_argument("--data_file", type=str, default="/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/data.json")
+    parser.add_argument("--data_file", type=str, default="/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/new_data.json")
     parser.add_argument("--save_file", type=str, default="/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/GPT/results/run_GPT_results.json")
     parser.add_argument("--deepseek_key", type=str, default="sk-dffc730848234fc3be92bf457ce88955")  # 保留参数位置，不回显你的真实密钥
     args = parser.parse_args()
@@ -119,11 +119,11 @@ def main():
             )
         for j in range(len(response)):
             generated_text.append({
+                "qid": contents[i + j]["qid"],  # 添加问题ID
                 "question": contents[i + j]["question"],
                 "model_answer": response[j]["choices"][0]["message"]["content"],
                 "gt_answer": contents[i + j]["answer"]
             })
-
     # 打印首条与数量；如果为空不会崩
     if generated_text:
         print(generated_text[0], len(generated_text))

@@ -7,6 +7,7 @@ from contextlib import nullcontext
 from typing import Dict, List
 import logging
 import math
+import re
 
 import faiss
 import numpy as np
@@ -25,10 +26,25 @@ from IPython import embed
 
 from bs4 import BeautifulSoup
 
+
 def clean_html(text):
-    """清理HTML标签"""
+    """清理HTML标签 - 改进版本"""
+    if not isinstance(text, str):
+        return str(text) if text is not None else ""
+
+    # 处理不完整的HTML标签
+    text = re.sub(r'<[^>]*$', '', text)  # 移除不完整的开始标签
+    text = re.sub(r'^[^<]*>', '', text)  # 移除不完整的结束标签
+
+    # 使用BeautifulSoup清理完整的HTML标签
     soup = BeautifulSoup(text, "html.parser")
-    return soup.get_text()
+    cleaned_text = soup.get_text().strip()
+
+    # 如果清理后为空，返回原始文本（去除HTML标签）
+    if not cleaned_text:
+        cleaned_text = re.sub(r'<[^>]*>', '', text).strip()
+
+    return cleaned_text if cleaned_text else "No title"
 
 
 NODE_TEXT_KEYS = {'maple': {'paper': ['title'], 'author': ['name'], 'venue': ['name']},
@@ -70,7 +86,7 @@ RELATION_NODE_TYPE_MAP = {
     'goodreads': {'author': 'author', 'publisher': 'publisher', 'series': 'series', 'similar_books': 'book',
                   'book': 'book'},
     'dblp': {'author': 'author', 'venue': 'venue', 'reference': 'paper', 'cited_by': 'paper', 'paper': 'paper'}
-    }
+}
 
 FEATURE_NODE_TYPE = {'maple': {'paper': ['title'], 'author': ['name'], 'venue': ['name']},
                      'amazon': {'item': ['title', 'price', 'category'], 'brand': ['name']},
@@ -95,7 +111,7 @@ class Retriever:
         logger.info("Initializing retriever")
 
         self.dataset = "amazon"
-        self.use_gpu = args.faiss_gpu  # 从args中获取use_gpu
+        self.use_gpu = args.faiss_gpu
         self.node_text_keys = args.node_text_keys
         self.model_name = args.embedder_name
         self.model = sentence_transformers.SentenceTransformer(args.embedder_name)
@@ -138,16 +154,39 @@ class Retriever:
             logger.info(f'loading text for {node_type}')
             for nid in tqdm(self.graph[node_type_key]):
                 tmp_string = ''
-                for k in self.node_text_keys[node_type]:
-                    vv = self.graph[node_type_key][nid]['features'][k]
-                    tmp_string += k + ": " + str(vv) + '. ' if (isinstance(vv, str) or not math.isnan(vv)) else ''
+                try:
+                    for k in self.node_text_keys[node_type]:
+                        if k in self.graph[node_type_key][nid]['features']:
+                            vv = self.graph[node_type_key][nid]['features'][k]
+
+                            # 改进的值处理
+                            if isinstance(vv, str):
+                                if k == 'title':
+                                    vv = clean_html(vv)
+                                if vv.strip():  # 只有非空字符串才添加
+                                    tmp_string += f"{k}: {vv}. "
+                            elif isinstance(vv, (int, float)) and not math.isnan(vv):
+                                tmp_string += f"{k}: {str(vv)}. "
+                            elif isinstance(vv, list) and vv:
+                                tmp_string += f"{k}: {', '.join(str(x) for x in vv)}. "
+
+                    # 如果没有有效内容，添加基本信息
+                    if not tmp_string.strip():
+                        tmp_string = f"Node ID: {nid}. Type: {node_type}. "
+
+                except Exception as e:
+                    logger.warning(f"Error processing node {nid}: {e}")
+                    tmp_string = f"Node ID: {nid}. Type: {node_type}. "
+
                 docs.append(tmp_string)
                 ids.append(nid)
                 meta_type.append(node_type)
 
-                # Debug: Check the generated text for each node
-                if len(tmp_string) < 50:  # If the generated string is too short
+                # Debug: 检查生成的文本
+                if len(tmp_string) < 20:
                     logger.info(f"Short context for {nid}: {tmp_string}")
+
+        logger.info(f"Processed {len(docs)} nodes")
         return docs, ids, meta_type
 
     def multi_gpu_infer(self, docs):
@@ -186,27 +225,6 @@ class Retriever:
         if self.use_gpu:
             self._move_index_to_gpu()
 
-    @classmethod
-    def build_embeddings(cls, model, corpus_dataset, args):
-        retriever = cls(model, corpus_dataset, args)
-        retriever.doc_embedding_inference()
-        return retriever
-
-    @classmethod
-    def from_embeddings(cls, model, args):
-        retriever = cls(model, None, args)
-        if args.process_index == 0:
-            retriever.init_index_and_add()
-        if args.world_size > 1:
-            torch.distributed.barrier()
-        return retriever
-
-    def reset_index(self):
-        if self.index:
-            self.index.reset()
-        self.doc_lookup = []
-        self.query_lookup = []
-
     def search_single(self, query, hop=1, topk=10):
         if self.index is None:
             raise ValueError("Index is not initialized")
@@ -214,53 +232,86 @@ class Retriever:
         query_embed = self.model.encode(query, show_progress_bar=False)
 
         D, I = self.index.search(query_embed[None, :], topk)
-        original_indice = np.array(self.doc_lookup)[I].tolist()[0][0]
-        original_type = np.array(self.doc_type)[I].tolist()[0][0]
 
-        if hop == 1:
-            context = self.one_hop(original_type, original_indice)
-        elif hop == 2:
-            context = self.two_hop(original_type, original_indice)
-        elif hop == 0:
-            context = self.zero_hop(original_type, original_indice)
-        else:
-            raise ValueError('Ego graph should be 0-hop, 1-hop or 2-hop.')
+        # 获取所有topk结果的信息
+        top_indices = np.array(self.doc_lookup)[I].tolist()[0]
+        top_types = np.array(self.doc_type)[I].tolist()[0]
+        top_scores = D.tolist()[0]
 
-        # Ensure result is being saved correctly
-        result = {'query': query, 'context': context}
+        logger.info(f"Top {len(top_indices)} results for query '{query}':")
+        for i, (idx, node_type, score) in enumerate(zip(top_indices, top_types, top_scores)):
+            logger.info(f"  {i + 1}. Node: {idx}, Type: {node_type}, Score: {score:.4f}")
 
-        # Save to file
+        # 使用最佳匹配
+        original_indice = top_indices[0]
+        original_type = top_types[0]
+
+        try:
+            if hop == 1:
+                context = self.one_hop(original_type, original_indice)
+            elif hop == 2:
+                context = self.two_hop(original_type, original_indice)
+            elif hop == 0:
+                context = self.zero_hop(original_type, original_indice)
+            else:
+                raise ValueError('Ego graph should be 0-hop, 1-hop or 2-hop.')
+        except Exception as e:
+            logger.error(f"Error generating context: {e}")
+            context = f"Error: Could not generate context for node {original_indice} of type {original_type}"
+
+        # 保存结果
+        result = {
+            'query': query,
+            'context': context,
+            'top_matches': [
+                {'node_id': idx, 'node_type': nt, 'score': float(score)}
+                for idx, nt, score in zip(top_indices[:5], top_types[:5], top_scores[:5])
+            ]
+        }
+
         result_filename = '/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/GPT/results/GPT_retriever_results.json'
-        with open(result_filename, 'w') as f:
-            json.dump(result, f, indent=4)
+        with open(result_filename, 'w', encoding='utf-8') as f:
+            json.dump(result, f, indent=4, ensure_ascii=False)
 
         return context
 
     def linearize_feature(self, node_type, node_indice):
+        """改进的特征线性化方法"""
         text = ''
-        for f_name in self.graph[f'{node_type}_nodes'][node_indice]['features']:
-            if f_name in FEATURE_NODE_TYPE[self.dataset][node_type]:
-                val = self.graph[f'{node_type}_nodes'][node_indice]['features'][f_name]
+        try:
+            node_features = self.graph[f'{node_type}_nodes'][node_indice]['features']
 
-                # 清理 title 中的 HTML 标签
-                if f_name == 'title' and isinstance(val, str):
-                    val = clean_html(val)
+            for f_name in node_features:
+                if f_name in FEATURE_NODE_TYPE[self.dataset][node_type]:
+                    val = node_features[f_name]
 
-                # 如果 val 是空的，提供默认值
-                if isinstance(val, str) and not val.strip():
-                    val = f"No {f_name}"
-                elif isinstance(val, list) and not val:
-                    val = f"No {f_name}"
-                elif isinstance(val, float) and math.isnan(val):
-                    val = f"No {f_name}"
+                    # 特殊处理title字段的HTML
+                    if f_name == 'title' and isinstance(val, str):
+                        val = clean_html(val)
 
-                # 拼接文本
-                if isinstance(val, str):
-                    text += f"{f_name}: {val}. "
-                elif isinstance(val, float):
-                    text += f"{f_name}: {str(val)}. "
-                elif isinstance(val, list):
-                    text += f"{f_name}: {', '.join(val)}. "
+                    # 处理空值
+                    if isinstance(val, str):
+                        if val.strip():  # 非空字符串
+                            text += f"{f_name}: {val}. "
+                        else:
+                            text += f"{f_name}: No {f_name}. "
+                    elif isinstance(val, (int, float)):
+                        if not math.isnan(val):
+                            text += f"{f_name}: {str(val)}. "
+                        else:
+                            text += f"{f_name}: No {f_name}. "
+                    elif isinstance(val, list):
+                        if val:  # 非空列表
+                            text += f"{f_name}: {', '.join(str(x) for x in val)}. "
+                        else:
+                            text += f"{f_name}: No {f_name}. "
+                    else:
+                        text += f"{f_name}: {str(val)}. "
+
+        except Exception as e:
+            logger.error(f"Error linearizing features for {node_type} {node_indice}: {e}")
+            text = f"Node {node_indice} of type {node_type}. "
+
         return text
 
     def zero_hop(self, node_type, node_indice):
@@ -271,49 +322,80 @@ class Retriever:
     def one_hop(self, node_type, node_indice, sample_n=20):
         context = 'Center node: '
         context += self.linearize_feature(node_type, node_indice)
-        for neighbor_type in self.graph[f'{node_type}_nodes'][node_indice]['neighbors']:
-            context += neighbor_type + ': '
-            for nid in self.graph[f'{node_type}_nodes'][node_indice]['neighbors'][neighbor_type][:sample_n]:
-                if isinstance(RELATION_NODE_TYPE_MAP[self.dataset][neighbor_type], str):
+
+        try:
+            node_neighbors = self.graph[f'{node_type}_nodes'][node_indice]['neighbors']
+
+            for neighbor_type in node_neighbors:
+                context += f"\n{neighbor_type}: "
+                neighbor_count = 0
+
+                for nid in node_neighbors[neighbor_type][:sample_n]:
                     try:
-                        context += self.linearize_feature(RELATION_NODE_TYPE_MAP[self.dataset][neighbor_type], nid)
-                    except:
-                        pass
-                elif isinstance(RELATION_NODE_TYPE_MAP[self.dataset][neighbor_type], List):
-                    for ntt in RELATION_NODE_TYPE_MAP[self.dataset][neighbor_type]:
-                        try:
-                            context += self.linearize_feature(ntt, nid)
-                        except:
-                            pass
-                else:
-                    raise ValueError('Something is going wrong here.')
+                        if isinstance(RELATION_NODE_TYPE_MAP[self.dataset][neighbor_type], str):
+                            neighbor_node_type = RELATION_NODE_TYPE_MAP[self.dataset][neighbor_type]
+                            neighbor_features = self.linearize_feature(neighbor_node_type, nid)
+                            if neighbor_features.strip():
+                                context += neighbor_features
+                                neighbor_count += 1
+                        elif isinstance(RELATION_NODE_TYPE_MAP[self.dataset][neighbor_type], list):
+                            for ntt in RELATION_NODE_TYPE_MAP[self.dataset][neighbor_type]:
+                                try:
+                                    neighbor_features = self.linearize_feature(ntt, nid)
+                                    if neighbor_features.strip():
+                                        context += neighbor_features
+                                        neighbor_count += 1
+                                except:
+                                    continue
+                    except Exception as e:
+                        logger.warning(f"Error processing neighbor {nid}: {e}")
+                        continue
+
+                if neighbor_count == 0:
+                    context += "No valid neighbors found. "
+
+        except Exception as e:
+            logger.error(f"Error in one_hop for {node_type} {node_indice}: {e}")
+            context += f"Error accessing neighbors: {e}"
 
         return context
 
     def two_hop(self, node_type, node_indice, sample_n=20):
         context = 'Center node: '
         context += self.linearize_feature(node_type, node_indice)
-        for neighbor_type in self.graph[f'{node_type}_nodes'][node_indice]['neighbors']:
-            context += neighbor_type + ': '
-            for nid in self.graph[f'{node_type}_nodes'][node_indice]['neighbors'][neighbor_type][:sample_n]:
-                try:
-                    context += '[' + self.one_hop(neighbor_type, nid) + '].'
-                except:
-                    pass
+
+        try:
+            node_neighbors = self.graph[f'{node_type}_nodes'][node_indice]['neighbors']
+
+            for neighbor_type in node_neighbors:
+                context += f"\n{neighbor_type}: "
+
+                for nid in node_neighbors[neighbor_type][:sample_n]:
+                    try:
+                        neighbor_context = self.one_hop(neighbor_type, nid, sample_n=5)  # 减少二跳的采样
+                        context += f'[{neighbor_context}]. '
+                    except Exception as e:
+                        logger.warning(f"Error in two_hop for neighbor {nid}: {e}")
+                        continue
+
+        except Exception as e:
+            logger.error(f"Error in two_hop for {node_type} {node_indice}: {e}")
+            context += f"Error accessing two-hop neighbors: {e}"
+
         return context
 
 
 if __name__ == '__main__':
     # ====== 构造 args ======
     args = Namespace(
-        faiss_gpu=False,                               # 是否用 GPU
-        node_text_keys=NODE_TEXT_KEYS['amazon'],       # 用 amazon 的 text keys
+        faiss_gpu=False,
+        node_text_keys=NODE_TEXT_KEYS['amazon'],
         embedder_name="sentence-transformers/all-mpnet-base-v2",
         embed_cache=True,
         embed_cache_dir="./cache"
     )
 
-    graph_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/amazon_magzine_graph.json"
+    graph_dir = "/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/magazine_graph.json"
     query = "quantum physics and machine learning"
 
     graph = json.load(open(graph_dir))
@@ -321,21 +403,19 @@ if __name__ == '__main__':
 
     # 执行查询
     context = node_retriever.search_single(query, 1)
+    print("=" * 50)
+    print("RETRIEVAL RESULT:")
+    print("=" * 50)
     print(context)
 
-    # ====== 创建文件夹 (如果不存在) ======
-    results_folder = '/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/GPT/results'  # 在当前目录下创建 results 文件夹
+    # 创建文件夹并保存结果
+    results_folder = '/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/GPT/results'
     os.makedirs(results_folder, exist_ok=True)
 
-    # ====== 确保结果保存到正确的文件路径 ======
-    result_filename = os.path.join(results_folder, 'GPT_retriever_results.json')  # 结果保存为 GPT_retriever_results.json
-
-    # ====== 创建结果字典并保存 ======
+    result_filename = os.path.join(results_folder, 'GPT_retriever_results.json')
     result = {'query': query, 'context': context}
 
-    # 保存查询结果到文件
-    with open(result_filename, 'w') as f:
-        json.dump(result, f, indent=4)
+    with open(result_filename, 'w', encoding='utf-8') as f:
+        json.dump(result, f, indent=4, ensure_ascii=False)
 
-    print(f"Results saved to {result_filename}")
-
+    print(f"\nResults saved to {result_filename}")

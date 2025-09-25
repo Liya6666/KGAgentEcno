@@ -3,16 +3,34 @@
   "node_id": "B0018L5RJY",
   "node_data": {
     "features": {
-      "title": " Magazines\" />",
+      "title": "Magazines\" />",
       "description": [],
       "price": "",
       "img": "",
-      "category": []
+      "category": [
+        "Magazine Subscriptions",
+        "Professional & Educational Journals",
+        "Professional & Trade"
+      ],
+      "main_cat": "Magazine Subscriptions",
+      "details": {
+        "Format:": "Print Magazine",
+        "Shipping: ": "Currently, item can be shipped only within the U.S.",
+        "Publisher:": "Future Publishing Ltd",
+        "ASIN: ": "B0018L5RJY"
+      }
     },
     "neighbors": {
-      "also_viewed_item": [],
+      "also_viewed_item": [
+        "B000UHI334"
+      ],
       "buy_after_viewing_item": [],
-      "also_bought_item": [],
+      "also_bought_item": [
+        "B000UHI334",
+        "B0029XHGSK",
+        "1423644506",
+        "B00005QJE6"
+      ],
       "bought_together_item": [],
       "brand": [
         "brand_478"
