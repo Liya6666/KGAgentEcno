@@ -10,6 +10,11 @@ import requests  # 使用 requests 库替换 OpenAI 的客户端
 from typing import List, Dict, Any
 import asyncio
 
+# 获取当前脚本所在的绝对路径
+sCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# 获取项目根目录（相对于脚本的位置向上两级）
+PROJECT_ROOT = os.path.abspath(os.path.join(sCRIPT_DIR, '..', '..'))
+
 logging.basicConfig(level=logging.INFO)
 logging.getLogger('httpx').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -71,9 +76,11 @@ def main():
     parser.add_argument("--dataset", type=str, default="amazon")
     # 默认改成 deepseek-chat；并放宽可选模型范围以支持 deepseek
     parser.add_argument("--gpt_version", type=str, default="deepseek-chat")
-    parser.add_argument("--data_file", type=str, default="/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/data/processed_data/amazon/new_data.json")
-    parser.add_argument("--save_file", type=str, default="/Users/yehaoran/Desktop/KGAgentEcno/Graph-CoT-main/GPT/results/run_GPT_results.json")
+    # 使用相对路径
+    parser.add_argument("--data_file", type=str, default=os.path.join(PROJECT_ROOT, 'data', 'processed_data', 'amazon', 'data.json'))
+    parser.add_argument("--save_file", type=str, default=os.path.join(PROJECT_ROOT, 'GPT', 'results', 'run_GPT_results.json'))
     parser.add_argument("--deepseek_key", type=str, default="sk-dffc730848234fc3be92bf457ce88955")  # 保留参数位置，不回显你的真实密钥
+    
     args = parser.parse_args()
 
     # 放宽 assert，允许 deepseek 的模型名
@@ -84,7 +91,7 @@ def main():
         contents = []
         for item in jsonlines.Reader(f):
             contents.append(item)
-
+    contents = contents[:20]
     system_message = "You are an AI assistant to answer questions. Please use your own knowledge to answer the questions. If you do not know the answer, please guess a most probable answer. Only include the answer in your response. Do not explain."
     query_messages = []
     for item in contents:
